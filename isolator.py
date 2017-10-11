@@ -88,9 +88,9 @@ xvec = np.linspace(-2, 2, num_points)
 ''' Initial condition '''
 psi0 = qt.tensor(qt.fock(N, 0), qt.fock(N, 0))
 
-#alpha = 1
-#psi0 = (qt.tensor(qt.coherent(N, alpha), qt.coherent(N, alpha)) -
-#    qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -alpha))).unit()
+alpha = 1
+psi0 = (qt.tensor(qt.coherent(N, alpha), qt.coherent(N, alpha)) -
+    qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -alpha))).unit()
 
 
 date = list(str(datetime.datetime.now())[:19])
@@ -99,7 +99,7 @@ date[16] = '-'
 
 ''' SUPER IMPORTANT: change the filepath to wherever you want the plots saved '''
 qutip_filepath = 'C:/Users/Wang Lab/Documents/qutip/'
-plot_filepath = qutip_filepath + 'out/half_cat/' + ''.join(date) + '/'
+plot_filepath = qutip_filepath + 'out/isolator/' + ''.join(date) + '/'
 data_filepath = qutip_filepath + 'data/half_cat/'
 
 if not os.path.exists(plot_filepath):
@@ -118,14 +118,6 @@ else:
     except:
         print('m_lib needs to be built')
         bla
-
-''' Optional profiling '''
-if 0:
-    alpha = 1.8
-    psi0 = (qt.tensor(qt.coherent(N, alpha), qt.coherent(N, alpha)) -
-        qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -alpha))).unit()
-    profile.run("wigner4d(psi0, xvec, 'reA-reB', dis_lib); print()")
-    profile.run("wigner4d(psi0, xvec, 'reA-imA', dis_lib); print()")
 
 ''' Setup Hamiltonian '''
 a = qt.tensor(qt.destroy(N), qt.qeye(N))

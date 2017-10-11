@@ -4,135 +4,66 @@ import matplotlib as mpl
 import numpy as np
 import datetime
 import os
-import itertools
 
-''' Call must set two of the arrays to the vec desired and leave other two '''
-def wigner4d(rho, points):
-    n = max(len(points[0]), len(points[1]), len(points[2]), len(points[3])) 
-    N = rho.dims[0][0]
-    W = np.empty((n, n), dtype = complex)
-    a = qt.tensor(qt.destroy(N), qt.qeye(N))
-    b = qt.tensor(qt.qeye(N), qt.destroy(N))
-    PJ = (1j * np.pi * a.dag() * a).expm() * (1j * np.pi * b.dag() * b).expm()
-    for i,j in itertools.product(range(n), range(n)):
-        #if (i*n+j)%n == 0: print(str(i) + '/' + str(n))
-        A = points[0][i,j] + points[1][i,j] * 1j
-        B = points[2][i,j] + points[3][i,j] * 1j
-
-        DA = qt.tensor(qt.displace(N, A), qt.qeye(N))
-        DB = qt.tensor(qt.qeye(N), qt.displace(N, B))
-        W[i,j] = (rho * DA * DB * PJ * DB.dag() * DA.dag()).tr()
-    return W
-                    
-    
-
-NA = 20
-NB = 20
-alpha = 1.9
-drive = .5
-loss = .5
-
-num_steps = 4
-max_time = 4
+import profile
 
 
-date = list(str(datetime.datetime.now())[:19])
-date[13] = '-'
-date[16] = '-'
-
-''' SUPER IMPORTANT: change the filepath to wherever you want the plots saved '''
-filepath = 'C:/Users/Wang Lab/Documents/qutip/out/wigner_test/' + ''.join(date) + '/'
-
-if not os.path.exists(filepath):
-    os.makedirs(filepath)
-
-a = qt.tensor(qt.destroy(NA), qt.qeye(NB))
-b = qt.tensor(qt.qeye(NB), qt.destroy(NA))
-
-PJ = (1j * np.pi * a.dag() * a).expm() * (1j * np.pi * b.dag() * b).expm()
-
-H = drive * a * b + drive.conjugate() * a.dag() * b.dag()
-#H = drive * (a * b) + drive.conjugate() * (a.dag() + b.dag())
+N = 50
+alpha = 1.
+drive = 9.
+loss = 9.
 
 
-psi_cat = (qt.tensor(qt.coherent(NA, alpha), qt.coherent(NB, alpha)) - 
-        qt.tensor(qt.coherent(NA, -alpha), qt.coherent(NB, -alpha))).unit()
+
+num_steps = 5
+max_time = 50
 
 
-psi0 = qt.tensor(qt.fock(NA, 0), qt.fock(NB, 0))
+
+
+a = qt.destroy(N)
+
+
+H = drive * a + drive.conjugate() * a.dag()
+
+
+psi0 = qt.fock(N, 0)
 
 ''' Solve the system '''
 times = np.linspace(0.0, max_time, num_steps)
-opts = qt.Options(store_states=True, nsteps=10000)
+opts = qt.Options(store_states=True, nsteps=100000)
 print(opts)
 print('solving...')
-result = qt.mesolve(H, psi0, times, [a*b], 
-                    [a.dag() * a, b.dag() * b], 
+#result = qt.mesolve(H, psi0, times, [loss * a], 
+#                    [a.dag() * a, a], 
+#                    options=opts, progress_bar = True)
+
+result = qt.mesolve(H*.0000001, psi0, times, [loss * (a + 2.0j * drive/loss**2 * qt.qeye(N))], 
+                    [a.dag() * a, a], 
                     options=opts, progress_bar = True)
 print('solved!')
 
 
-
-num_points = 100
+num_points = 25
 xvec = np.linspace(-5, 5, num_points)
 
-print('plotting reA vs imA')
-''' reA vs imA '''
-fig = pl.figure(figsize=(10,10))
+
+fig = pl.figure(figsize=(5*num_steps, 10))
 for i in range(num_steps):
-    pl.subplot(2,2,i+1)
-    W = qt.wigner(result.states[i].ptrace(0), xvec, xvec) * np.pi
-    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 100, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('t=' + str(i*max_time/num_steps))
+    print(str(i) + '/' + str(num_steps))
+    pl.subplot(2, num_steps, i+1)
+    W = qt.wigner(result.states[i], xvec, xvec)
+    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
+    pl.title(' reA vs imA t=' + str(i*max_time/num_steps))
     pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
+    
+    pl.subplot(2, num_steps, i+1 + num_steps)
+    pl.plot(range(N), result.states[i].diag())
 
-pl.savefig(filepath + 'reA-imA.png')
-pl.clf()
 
-print('plotting reB vs imB')
-''' reB vs imB '''
-fig = pl.figure(figsize=(10,10))
-for i in range(num_steps):
-    pl.subplot(2,2,i+1)
-    W = qt.wigner(result.states[i].ptrace(1), xvec, xvec) * np.pi
-    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 100, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('t=' + str(i*max_time/num_steps))
-    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
+#pl.show()
 
-pl.savefig(filepath + 'reB-imB.png')
-pl.clf()
+print(result.expect[0])
 
-num_points = 40
-xvec = np.linspace(-2.5, 2.5, num_points)
-
-print('plotting reA vs reB')
-''' reA vs reB '''
-fig = pl.figure(figsize=(10,10))
-for i in range(num_steps):
-    pl.subplot(2,2,i+1)
-    points = [np.meshgrid(xvec, xvec)[0], np.zeros((num_points, num_points)), 
-              np.meshgrid(xvec, xvec)[1], np.zeros((num_points, num_points))]
-    W = wigner4d(qt.ket2dm(result.states[i]), points)
-    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 100, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('t=' + str(i*max_time/num_steps))
-    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
-
-pl.savefig(filepath + 'reA-reB.png')
-pl.clf()
-
-print('plotting imA vs imB')
-''' imA vs imB '''
-fig = pl.figure(figsize=(10,10))
-for i in range(num_steps):
-    pl.subplot(2,2,i+1)
-    points = [np.zeros((num_points, num_points)), np.meshgrid(xvec, xvec)[0],  
-              np.zeros((num_points, num_points)), np.meshgrid(xvec, xvec)[1]]
-    W = wigner4d(qt.ket2dm(result.states[i]), points)
-    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 100, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('t=' + str(i*max_time/num_steps))
-    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
-
-pl.savefig(filepath + 'imA-imB.png')
-pl.clf()
-
+print(result.expect[1])
 
