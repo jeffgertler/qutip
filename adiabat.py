@@ -1,3 +1,5 @@
+
+
 import qutip as qt
 import matplotlib.pyplot as pl
 import matplotlib as mpl
@@ -64,15 +66,15 @@ def build_m_lib(N, num_points, xvec, data_filepath):
     print('build time: ' + str(time.time()-t_start) + ' sec')
     return m_lib
 
-def c_tanh(t, args):
-    return (np.tanh((t - 2 * args['tao']) / args['tao']) + 1) / 2
+#def c_linear(t, args):
+#    if isinstance(t, float):
+#        return max(1.0-args['v'] * t, 0.0)
+#    else:
+#        return np.maximum(1.0-args['v'] * t, np.zeros(len(t)))
 
+''' Testing if middle state is steady state '''
 def c_linear(t, args):
-    if args['v'] * t < 1.0:
-        return args['v'] * t
-    else:
-        return 1.0
-
+    return .5
 
 print(sys.argv)
 #theta = float(sys.argv[1]) * np.pi
@@ -82,37 +84,32 @@ print(sys.argv)
 #tao = float(sys.argv[5])
 theta = np.pi / 2
 phi = 0
-lam = -4
-gamma = 2
-tao = 0 
-v = .5
+lam = -10j
+gamma = 1
+v = .1
 
 
 ''' Parameters '''
-N = 20
+N = 35
 joint_drive = lam
 loss = 0.
 joint_loss = 1
 confinment_loss = gamma
 
 ''' Solver time steps '''
-num_steps = 20
-max_time = 5
-
-''' @ 2tao away the value of tanh is .98 This garuntees that the rising edge 
-    will be smooth and that the tanh will reach at least .98 before max_time'''
-if(4*tao > max_time):
-    print('Must satisfy 4*tao <= max_time')
-    bla
+num_steps = 30
+max_time = 20
 
 ''' Wigner plot parameters '''
 num_points = 25
 xvec = np.linspace(-2, 2, num_points)
 
 ''' Initial condition '''
-#psi0 = qt.tensor(qt.fock(N, 0), qt.fock(N, 0))
-alpha = 0
-beta = np.sqrt(-2j * lam.conjugate())
+#alpha = 0
+#beta = np.sqrt(-2j * lam.conjugate())
+''' Testing middle state is steady state '''
+alpha = np.sqrt(-2j * lam.conjugate())/2
+beta = np.sqrt(-2j * lam.conjugate())/2
 psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
         + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit()
 
@@ -129,12 +126,14 @@ b = qt.tensor(qt.qeye(N), qt.destroy(N))
 drive_term = (a + b) **2
 confinment_term = b ** 2
 
+
 loss_ops = [joint_loss * drive_term, confinment_term * confinment_loss]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, confinment_term * confinment_loss]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, [confinment_term * confinment_loss, c_tanh]]
-args = {'tao': tao}
+args = {'v': v}
 
-H = joint_drive * drive_term + joint_drive.conjugate() * drive_term.dag()
+H = [joint_drive * drive_term + joint_drive.conjugate() * drive_term.dag(),
+     [joint_drive * confinment_term + joint_drive.conjugate() * confinment_term.dag(), c_linear]]
 times = np.linspace(0.0, max_time, num_steps, endpoint=True)
 
 
@@ -144,7 +143,7 @@ date[16] = '-'
 
 ''' SUPER IMPORTANT: change the filepath to wherever you want the plots saved '''
 qutip_filepath = 'C:/Users/Wang Lab/Documents/qutip/'
-plot_filepath = qutip_filepath + 'out/double_drive/' + ''.join(date) + '/'
+plot_filepath = qutip_filepath + 'out/adiabat/' + ''.join(date) + '/'
 data_filepath = qutip_filepath + 'data/'
 
 if not os.path.exists(plot_filepath):
@@ -187,7 +186,7 @@ for i in range(num_steps):
     start_fidelity[i] = round(qt.fidelity(result.states[i], psi0), 4)
     final_fidelity[i] = round(qt.fidelity(result.states[i], psi_final), 4)
     
-fit_start = 5
+fit_start = 20
 y_fit = final_fidelity[fit_start:]
 x_fit = times[fit_start:]
 
@@ -229,8 +228,8 @@ pl.clf()
 np.savetxt(plot_filepath + 'fidelity.txt', [times, final_fidelity])
 
 fig = pl.figure(figsize = (5, 5))
-pl.plot(times, c_tanh(times, args))
-pl.savefig(plot_filepath + 'tanh_curve.png')
+pl.plot(times, c_linear(times, args))
+pl.savefig(plot_filepath + 'adiabat_curve.png')
 pl.clf()
 
 
@@ -327,6 +326,8 @@ pl.clf()
 
 pl.close('all')
 
+
+
 ''' Saving textfile with information about the run '''
 np.savetxt(plot_filepath + 'header.txt', [0], 
          header = 
@@ -339,7 +340,6 @@ np.savetxt(plot_filepath + 'header.txt', [0],
          '\n beta = ' + str(beta) + 
          '\n theta = ' + str(theta) + 
          '\n phi = ' + str(phi) + 
-         '\n tao = ' + str(tao) + 
          '\n num_points = ' + str(num_points) +
          '\n num_steps = ' + str(num_steps) + 
          '\n max_time = ' + str(max_time))
