@@ -42,10 +42,156 @@ def wigner4d(rho, xvec):
 
 ''' Testing if middle state is steady state '''
 def c_linear(t, args):
+    t += args['start_time']
     if isinstance(t, float):
         return max(.25-args['v'] * t, 0.0)
     else:
         return np.maximum(.25-args['v'] * t, np.zeros(len(t)))
+
+
+def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_filepath):
+    start_fidelity = np.zeros(num_steps)
+    final_fidelity = np.zeros_like(start_fidelity)
+    for i in range(num_steps):
+        start_fidelity[i] = round(qt.fidelity(states[i], psi0), 4)
+        final_fidelity[i] = round(qt.fidelity(states[i], psi_final), 4)
+        
+    fit_start = 20
+    y_fit = final_fidelity[fit_start:]
+    x_fit = times[fit_start:]
+
+    ''' Fidelity with starting cat state '''
+    fig = pl.figure(figsize=(10,15))
+    pl.subplot(3, 1, 1)
+    pl.plot(times, start_fidelity, '.')
+    pl.title('Fidelity with starting cat state')
+
+    ''' Fidelity with final cat state '''
+    pl.subplot(3, 1, 2)
+    pl.plot(times, final_fidelity, '.')
+
+    try:
+        popt, pcov = curve_fit(lambda x_fit,a_fit,b_fit,c_fit : a_fit * np.exp(b_fit * x_fit) + c_fit, x_fit, y_fit, p0 = (-1, -.1, 0))
+        a_fit,b_fit,c_fit = popt
+        print(a_fit, b_fit, c_fit)
+        pl.plot(x_fit, a_fit * np.exp(b_fit * x_fit) + c_fit)
+        pl.title(str(a_fit) + ',' + str(b_fit) + ',' + str(c_fit))
+    except:
+        print('fit didnt work')
+
+
+    p = (1j * np.pi * (a.dag() * a + b.dag() * b)).expm()
+    parity = np.zeros(num_steps)
+    for i in range(num_steps):
+        parity[i] = round(qt.expect(p, states[i]), 4)
+    pl.subplot(3, 1, 3)
+    pl.plot(times, parity)
+    pl.title('joint parity')
+
+    pl.savefig(plot_filepath + 'Fidelity' + str(plot_num) + '.png')
+    pl.clf()
+
+    np.savetxt(plot_filepath + 'fidelity' + str(plot_num) + '.txt', [times, final_fidelity])
+
+
+    print('building cat array')
+    beta_steps = 50
+    cat_state_arr = []
+    alpha_max = np.sqrt(-2j * lam.conjugate())
+    beta_arr = np.linspace(0, alpha_max, beta_steps)
+    for j in range(beta_steps):
+        alpha = alpha_max - beta_arr[j]
+        beta = beta_arr[j]
+        cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
+            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit())
+
+    print('calculating 2d fidelity')
+    fidelity_arr = np.zeros((num_steps, beta_steps))
+    for i in range(num_steps):
+        print(i)
+        for j in range(beta_steps):
+            fidelity_arr[i][j] = round(qt.fidelity(states[i], cat_state_arr[j]), 4)
+            
+    pl.subplot(3,1,1)
+    pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1], beta_arr[0]))
+    pl.colorbar()
+    pl.ylabel('beta')
+    pl.subplot(3,1,2)
+    pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha_max, label='current state')
+    pl.plot(times, c_linear(times, args), label='steady state')
+    pl.ylabel('beta/alpha')
+    pl.legend() 
+    pl.subplot(3,1,3)
+    pl.plot(times, np.max(fidelity_arr, axis=1))
+    pl.ylabel('fidelity')
+    pl.xlabel('time')
+    pl.savefig(plot_filepath + '2d_fidelity' + str(plot_num) + '.png')
+    pl.clf()
+
+
+
+    fig = pl.figure(figsize=(5 * num_steps, 10))
+    for i in range(num_steps):
+        ''' Cavity A occupation '''
+        pl.subplot(4, num_steps, i+1)
+        pl.plot(range(N), states[i].ptrace(0).diag())
+        pl.title('Cavity A occupation')
+
+        ''' Cavity A occupation '''
+        pl.subplot(4, num_steps, i+1 + num_steps)
+        pl.plot(range(N), states[i].ptrace(1).diag())
+        pl.title('Cavity B occupation')
+
+    pl.savefig(plot_filepath + 'Occupation' + str(plot_num) + '.png')
+    pl.clf()
+
+    num_points = 40
+    xvec_2d = np.linspace(-6, 6, num_points)
+
+    fig = pl.figure(figsize=(2.5 * num_steps, 10))
+    for i in range(num_steps):
+        ''' Cavity A wigner '''
+        pl.subplot(4, num_steps, i+1)
+        W = qt.wigner(states[i].ptrace(0), xvec_2d, xvec_2d) * np.pi
+        pl.contourf(xvec_2d, xvec_2d, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
+        pl.title('Cavity A wigner')
+        pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
+
+
+        ''' Cavity B wigner '''
+        pl.subplot(4, num_steps, i+1 + num_steps)
+        W = qt.wigner(states[i].ptrace(1), xvec_2d, xvec_2d) * np.pi
+        pl.contourf(xvec_2d, xvec_2d, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
+        pl.title('Cavity B wigner')
+        pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
+
+    pl.savefig(plot_filepath + '2d_wigner' + str(plot_num) + '.png')
+    pl.clf()
+
+
+
+    #num_points = 5
+    #xvec = np.linspace(-4, 4, num_points)
+    #t_start = time.time()
+    #
+    #fig = pl.figure(figsize=(5 * num_steps, 5))
+    #for n in range(num_steps):
+    #    ''' reA vs reB '''
+    #    pl.subplot(1, num_steps, n+1)
+    #    W = wigner4d(states[n], xvec)
+    #    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
+    #    pl.title('reA vs reB t=' + str(times[n]))
+    #    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
+    #    
+    #print(str(num_steps) + ' plots created in ' + str(time.time()-t_start) + ' sec')
+    #
+    #pl.savefig(plot_filepath + 'ReRe_wigner_cuts' + str(plot_num) + '.png')
+    #pl.clf()
+
+
+
+    pl.close('all')
+
 
 print(sys.argv)
 #theta = float(sys.argv[1]) * np.pi
@@ -55,22 +201,23 @@ print(sys.argv)
 #tao = float(sys.argv[5])
 theta = np.pi / 2
 phi = 0
-lam = -7j
+lam = -1j
 gamma = 1
 v = .1
 
 
 ''' Parameters '''
-N = 40
+N = 15
 joint_drive = lam
 loss = 0.
 joint_loss = 1
 confinment_loss = gamma
 
 ''' Solver time steps '''
-num_steps = 30
-max_time = 5
-
+num_steps = 20
+max_time = .1
+times = np.linspace(0.0, max_time, num_steps, endpoint=True)
+break_points = [0, 5, 10, 15, num_steps]
 
 ''' Initial condition '''
 #alpha = 0
@@ -98,11 +245,10 @@ confinment_term = b ** 2
 loss_ops = [joint_loss * drive_term, confinment_term * confinment_loss]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, confinment_term * confinment_loss]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, [confinment_term * confinment_loss, c_tanh]]
-args = {'v': v}
+
 
 H = [joint_drive * drive_term + joint_drive.conjugate() * drive_term.dag(),
      [joint_drive * confinment_term + joint_drive.conjugate() * confinment_term.dag(), c_linear]]
-times = np.linspace(0.0, max_time, num_steps, endpoint=True)
 
 
 date = list(str(datetime.datetime.now())[:19])
@@ -110,7 +256,7 @@ date[13] = '-'
 date[16] = '-'
 
 ''' SUPER IMPORTANT: change the filepath to wherever you want the plots saved '''
-qutip_filepath = 'C:/Users/Wang Lab/Documents/qutip/'
+qutip_filepath = ''
 plot_filepath = qutip_filepath + 'out/adiabat/' + ''.join(date) + '/'
 data_filepath = qutip_filepath + 'data/'
 
@@ -119,186 +265,54 @@ if not os.path.exists(plot_filepath):
 if not os.path.exists(data_filepath):
     os.makedirs(data_filepath)
 
-
-
-
-
 ''' Solve the system or load from save'''
+args = {'v': v, 'start_time':0.0}
 if 1:
-    opts = qt.Options(store_states=True, nsteps=100000)
-#    print(opts)
     print('solving...')
-#    result = qt.mesolve(H, psi0, times, [loss * a**2], 
-#                        [a.dag() * a, b.dag() * b], 
-#                        options=opts, progress_bar = True)
-    result = qt.mesolve(H, psi0, times, loss_ops, [a.dag() * a, b.dag() * b], 
-                        options=opts, progress_bar = True, args = args)
-    print('solved!')
-    qt.fileio.qsave(result, name = data_filepath + 'result')
+    opts = qt.Options(store_states=True, nsteps=100000)
+    psi_current = psi0
+    states = []
+
+    for i in range(1, len(break_points)):
+        print('sub_simulation #' + str(i))
+
+        
+        args['start_time'] = times[break_points[i-1]]
+        result = qt.mesolve(H, psi_current, times[break_points[i-1]:break_points[i]]- times[break_points[i-1]]
+                            , loss_ops, [a.dag() * a, b.dag() * b], 
+                            options=opts, progress_bar = True, args = args)
+        states += result.states
+        print('solved!')
+
+        psi_current = states[-1]
+
+        print('plotting')
+        plot_num = i
+
+        args['start_time'] = 0.0
+        if i == len(break_points)-1:
+            plot_filepath += 'full/'
+        make_plots(plot_num, break_points[i], times[0:break_points[i]], states, psi0, psi_final, N, plot_filepath)
+
+        
+        qt.fileio.qsave(result, name = data_filepath + 'result' + str(plot_num))
+
 else:
     print('loading result')
     try:
-        result = qt.fileio.qload(data_filepath + 'result')
+        states = []
+        for i in range(1, len(break_points)):
+            result = qt.fileio.qload(data_filepath + 'result' + str(plot_num))
+            states += result.states
     except:
         print('result needs to be solved')
 
+    make_plots(0, num_steps, times, states, psi0, psi_final, N, plot_filepath)
 
 
-
-print('plotting')
-
-
-start_fidelity = np.zeros(num_steps)
-final_fidelity = np.zeros_like(start_fidelity)
-for i in range(num_steps):
-    start_fidelity[i] = round(qt.fidelity(result.states[i], psi0), 4)
-    final_fidelity[i] = round(qt.fidelity(result.states[i], psi_final), 4)
     
-fit_start = 20
-y_fit = final_fidelity[fit_start:]
-x_fit = times[fit_start:]
 
 
-
-
-
-''' Fidelity with starting cat state '''
-fig = pl.figure(figsize=(10,15))
-pl.subplot(3, 1, 1)
-pl.plot(times, start_fidelity, '.')
-pl.title('Fidelity with starting cat state')
-
-''' Fidelity with final cat state '''
-pl.subplot(3, 1, 2)
-pl.plot(times, final_fidelity, '.')
-
-try:
-    popt, pcov = curve_fit(lambda x_fit,a_fit,b_fit,c_fit : a_fit * np.exp(b_fit * x_fit) + c_fit, x_fit, y_fit, p0 = (-1, -.1, 0))
-    a_fit,b_fit,c_fit = popt
-    print(a_fit, b_fit, c_fit)
-    pl.plot(x_fit, a_fit * np.exp(b_fit * x_fit) + c_fit)
-    pl.title(str(a_fit) + ',' + str(b_fit) + ',' + str(c_fit))
-except:
-    print('fit didnt work')
-
-
-p = (1j * np.pi * (a.dag() * a + b.dag() * b)).expm()
-parity = np.zeros(num_steps)
-for i in range(num_steps):
-    parity[i] = round(qt.expect(p, result.states[i]), 4)
-pl.subplot(3, 1, 3)
-pl.plot(times, parity)
-pl.title('joint parity')
-
-pl.savefig(plot_filepath + 'Fidelity.png')
-pl.clf()
-
-np.savetxt(plot_filepath + 'fidelity.txt', [times, final_fidelity])
-
-
-print('building cat array')
-beta_steps = 50
-cat_state_arr = []
-alpha_max = np.sqrt(-2j * lam.conjugate())
-beta_arr = np.linspace(0, alpha_max, beta_steps)
-for j in range(beta_steps):
-    alpha = alpha_max - beta_arr[j]
-    beta = beta_arr[j]
-    cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit())
-
-print('calculating 2d fidelity')
-fidelity_arr = np.zeros((num_steps, beta_steps))
-for i in range(num_steps):
-    print(i)
-    for j in range(beta_steps):
-        fidelity_arr[i][j] = round(qt.fidelity(result.states[i], cat_state_arr[j]), 4)
-        
-pl.subplot(3,1,1)
-pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1], beta_arr[0]))
-pl.colorbar()
-pl.ylabel('beta')
-pl.subplot(3,1,2)
-pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha_max, label='current state')
-pl.plot(times, c_linear(times, args), label='steady state')
-pl.ylabel('beta/alpha')
-pl.legend() 
-pl.subplot(3,1,3)
-pl.plot(times, np.max(fidelity_arr, axis=1))
-pl.ylabel('fidelity')
-pl.xlabel('time')
-pl.savefig(plot_filepath + '2d_fidelity.png')
-pl.clf()
-
-
-
-fig = pl.figure(figsize = (5, 5))
-pl.plot(times, c_linear(times, args))
-pl.savefig(plot_filepath + 'adiabat_curve.png')
-pl.clf()
-
-
-fig = pl.figure(figsize=(5 * num_steps, 10))
-for i in range(num_steps):
-    ''' Cavity A occupation '''
-    pl.subplot(4, num_steps, i+1)
-    pl.plot(range(N), result.states[i].ptrace(0).diag())
-    pl.title('Cavity A occupation')
-
-    ''' Cavity A occupation '''
-    pl.subplot(4, num_steps, i+1 + num_steps)
-    pl.plot(range(N), result.states[i].ptrace(1).diag())
-    pl.title('Cavity B occupation')
-
-pl.savefig(plot_filepath + 'Occupation.png')
-pl.clf()
-
-num_points = 40
-xvec_2d = np.linspace(-6, 6, num_points)
-
-fig = pl.figure(figsize=(2.5 * num_steps, 10))
-for i in range(num_steps):
-    ''' Cavity A wigner '''
-    pl.subplot(4, num_steps, i+1)
-    W = qt.wigner(result.states[i].ptrace(0), xvec_2d, xvec_2d) * np.pi
-    pl.contourf(xvec_2d, xvec_2d, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('Cavity A wigner')
-    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
-
-
-    ''' Cavity B wigner '''
-    pl.subplot(4, num_steps, i+1 + num_steps)
-    W = qt.wigner(result.states[i].ptrace(1), xvec_2d, xvec_2d) * np.pi
-    pl.contourf(xvec_2d, xvec_2d, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
-    pl.title('Cavity B wigner')
-    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
-
-pl.savefig(plot_filepath + '2d_wigner.png')
-pl.clf()
-
-
-
-#num_points = 5
-#xvec = np.linspace(-4, 4, num_points)
-#t_start = time.time()
-#
-#fig = pl.figure(figsize=(5 * num_steps, 5))
-#for n in range(num_steps):
-#    ''' reA vs reB '''
-#    pl.subplot(1, num_steps, n+1)
-#    W = wigner4d(result.states[n], xvec)
-#    pl.contourf(xvec, xvec, W, np.linspace(-1.0, 1.0, 41, endpoint=True), cmap=mpl.cm.RdBu_r)
-#    pl.title('reA vs reB t=' + str(times[n]))
-#    pl.colorbar(ticks = np.linspace(-1.0, 1.0, 11, endpoint=True))
-#    
-#print(str(num_steps) + ' plots created in ' + str(time.time()-t_start) + ' sec')
-#
-#pl.savefig(plot_filepath + 'ReRe_wigner_cuts.png')
-#pl.clf()
-
-
-
-pl.close('all')
 
 ''' Saving textfile with information about the run '''
 np.savetxt(plot_filepath + 'header.txt', [0], 
@@ -312,7 +326,6 @@ np.savetxt(plot_filepath + 'header.txt', [0],
          '\n beta = ' + str(beta) + 
          '\n theta = ' + str(theta) + 
          '\n phi = ' + str(phi) + 
-         '\n num_points = ' + str(num_points) +
          '\n num_steps = ' + str(num_steps) + 
          '\n max_time = ' + str(max_time))
 
