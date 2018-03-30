@@ -34,19 +34,18 @@ def wigner4d(rho, xvec):
     return np.real(W)
 
 
-#def c_linear(t, args):
-#    if isinstance(t, float):
-#        return max(1.0-args['v'] * t, 0.0)
-#    else:
-#        return np.maximum(1.0-args['v'] * t, np.zeros(len(t)))
+def c_linear(t, args):
+    if isinstance(t, float):
+        return (max(1.0-args['v'] * t, 0.0))**2
+    else:
+        return (np.maximum(1.0-args['v'] * t, np.zeros(len(t))))**2
 
 ''' Testing if middle state is steady state '''
-def c_linear(t, args):
-    t += args['start_time']
-    if isinstance(t, float):
-        return max(.25-args['v'] * t, 0.0)
-    else:
-        return np.maximum(.25-args['v'] * t, np.zeros(len(t)))
+#def c_linear(t, args):
+#    if isinstance(t, float):
+#        return (max(.15-args['v'] * t, 0.0))**2
+#    else:
+#        return np.power(np.maximum(.15-args['v'] * t, np.zeros(len(t))), 2)
 
 
 def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_filepath):
@@ -198,12 +197,12 @@ print(sys.argv)
 #phi = float(sys.argv[2]) * np.pi
 #lam = complex(sys.argv[3])
 #gamma = float(sys.argv[4])
-#tao = float(sys.argv[5])
+#v = float(sys.argv[5])
 theta = np.pi / 2
 phi = 0
 lam = -1j
 gamma = 1
-v = .1
+v = .2
 
 
 ''' Parameters '''
@@ -215,24 +214,24 @@ confinment_loss = gamma
 
 ''' Solver time steps '''
 num_steps = 20
-max_time = .1
+max_time = 5
 times = np.linspace(0.0, max_time, num_steps, endpoint=True)
 break_points = [0, 5, 10, 15, num_steps]
+
 
 ''' Initial condition '''
 #alpha = 0
 #beta = np.sqrt(-2j * lam.conjugate())
 ''' Testing middle state is steady state '''
-alpha = np.sqrt(-2j * lam.conjugate()) * .75
-beta = np.sqrt(-2j * lam.conjugate()) * .25
-psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit()
+alpha = np.sqrt(-2j * lam.conjugate())
+beta = alpha * .15
+psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), qt.coherent(N, beta)) 
+        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), qt.coherent(N, -beta))).unit()
 
 ''' guess at final condition '''
-alpha = np.sqrt(-2j * lam.conjugate())
 beta = 0
-psi_final = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit()
+psi_final = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), qt.coherent(N, beta)) 
+            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), qt.coherent(N, -beta))).unit()
 
 ''' Setup operators '''
 a = qt.tensor(qt.destroy(N), qt.qeye(N))
@@ -308,9 +307,6 @@ else:
         print('result needs to be solved')
 
     make_plots(0, num_steps, times, states, psi0, psi_final, N, plot_filepath)
-
-
-    
 
 
 
