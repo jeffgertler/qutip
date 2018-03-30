@@ -34,30 +34,36 @@ def wigner4d(rho, xvec):
     return np.real(W)
 
 
-#def c_linear(t, args):
-#    if isinstance(t, float):
-#        return max(1.0-args['v'] * t, 0.0)
-#    else:
-#        return np.maximum(1.0-args['v'] * t, np.zeros(len(t)))
-
-''' Testing if middle state is steady state '''
 def c_linear(t, args):
     if isinstance(t, float):
-        return max(.25-args['v'] * t, 0.0)
+        return (max(1.0-args['v'] * t, 0.0))**2
     else:
-        return np.maximum(.25-args['v'] * t, np.zeros(len(t)))
+        return (np.maximum(1.0-args['v'] * t, np.zeros(len(t))))**2
+
+''' Testing if middle state is steady state '''
+#def c_linear(t, args):
+#    if isinstance(t, float):
+#        return (max(.15-args['v'] * t, 0.0))**2
+#    else:
+#        return np.power(np.maximum(.15-args['v'] * t, np.zeros(len(t))), 2)
+
+#def c_linear(t, args):
+#    if isinstance(t, float):
+#        return (.5)**2
+#    else:
+#        return (.5)**2 * np.ones(len(t))
 
 print(sys.argv)
-#theta = float(sys.argv[1]) * np.pi
-#phi = float(sys.argv[2]) * np.pi
-#lam = complex(sys.argv[3])
-#gamma = float(sys.argv[4])
-#tao = float(sys.argv[5])
-theta = np.pi / 2
-phi = 0
-lam = -7j
-gamma = 1
-v = .1
+theta = float(sys.argv[1]) * np.pi
+phi = float(sys.argv[2]) * np.pi
+lam = complex(sys.argv[3])
+gamma = float(sys.argv[4])
+v = float(sys.argv[5])
+#theta = np.pi / 2
+#phi = 0
+#lam = -7j
+#gamma = 1
+#v = .1
 
 
 ''' Parameters '''
@@ -69,23 +75,22 @@ confinment_loss = gamma
 
 ''' Solver time steps '''
 num_steps = 30
-max_time = 5
+max_time = 6
 
 
 ''' Initial condition '''
 #alpha = 0
 #beta = np.sqrt(-2j * lam.conjugate())
 ''' Testing middle state is steady state '''
-alpha = np.sqrt(-2j * lam.conjugate()) * .75
-beta = np.sqrt(-2j * lam.conjugate()) * .25
-psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit()
+alpha = np.sqrt(-2j * lam.conjugate())
+beta = alpha * .15
+psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), qt.coherent(N, beta)) 
+        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), qt.coherent(N, -beta))).unit()
 
 ''' guess at final condition '''
-alpha = np.sqrt(-2j * lam.conjugate())
 beta = 0
-psi_final = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit()
+psi_final = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), qt.coherent(N, beta)) 
+            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), qt.coherent(N, -beta))).unit()
 
 ''' Setup operators '''
 a = qt.tensor(qt.destroy(N), qt.qeye(N))
@@ -199,28 +204,26 @@ np.savetxt(plot_filepath + 'fidelity.txt', [times, final_fidelity])
 print('building cat array')
 beta_steps = 50
 cat_state_arr = []
-alpha_max = np.sqrt(-2j * lam.conjugate())
-beta_arr = np.linspace(0, alpha_max, beta_steps)
+beta_arr = np.linspace(0, alpha, beta_steps)
 for j in range(beta_steps):
-    alpha = alpha_max - beta_arr[j]
     beta = beta_arr[j]
-    cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit())
+    cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta_arr[j]), qt.coherent(N, beta_arr[j])) 
+        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta_arr[j]), qt.coherent(N, -beta_arr[j]))).unit())
 
 print('calculating 2d fidelity')
 fidelity_arr = np.zeros((num_steps, beta_steps))
 for i in range(num_steps):
-    print(i)
+#    print(i)
     for j in range(beta_steps):
         fidelity_arr[i][j] = round(qt.fidelity(result.states[i], cat_state_arr[j]), 4)
         
 pl.subplot(3,1,1)
-pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1], beta_arr[0]))
+pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1]/alpha, beta_arr[0]/alpha))
 pl.colorbar()
-pl.ylabel('beta')
+pl.ylabel('beta/alpha')
 pl.subplot(3,1,2)
-pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha_max, label='current state')
-pl.plot(times, c_linear(times, args), label='steady state')
+pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha, label='current state')
+pl.plot(times, np.sqrt(c_linear(times, args)), label='steady state')
 pl.ylabel('beta/alpha')
 pl.legend() 
 pl.subplot(3,1,3)
