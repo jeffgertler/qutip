@@ -35,6 +35,7 @@ def wigner4d(rho, xvec):
 
 
 def c_linear(t, args):
+    t += args['start_time']
     if isinstance(t, float):
         return (max(1.0-args['v'] * t, 0.0))**2
     else:
@@ -94,30 +95,29 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
 
 
     print('building cat array')
-    beta_steps = 50
+    beta_steps = 10
     cat_state_arr = []
-    alpha_max = np.sqrt(-2j * lam.conjugate())
-    beta_arr = np.linspace(0, alpha_max, beta_steps)
+    beta_arr = np.linspace(0, alpha, beta_steps)
     for j in range(beta_steps):
-        alpha = alpha_max - beta_arr[j]
-        beta = beta_arr[j]
-        cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha), qt.coherent(N, beta)) 
-            + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha), qt.coherent(N, -beta))).unit())
+        cat_state_arr.append((np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta_arr[j]), 
+                                                                       qt.coherent(N, beta_arr[j])) 
+         + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta_arr[j]), 
+                                                                       qt.coherent(N, -beta_arr[j]))).unit())
 
     print('calculating 2d fidelity')
     fidelity_arr = np.zeros((num_steps, beta_steps))
     for i in range(num_steps):
-        print(i)
+        #print(i)
         for j in range(beta_steps):
             fidelity_arr[i][j] = round(qt.fidelity(states[i], cat_state_arr[j]), 4)
             
     pl.subplot(3,1,1)
-    pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1], beta_arr[0]))
+    pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1]/alpha, beta_arr[0]/alpha))
     pl.colorbar()
-    pl.ylabel('beta')
+    pl.ylabel('beta/alpha')
     pl.subplot(3,1,2)
-    pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha_max, label='current state')
-    pl.plot(times, c_linear(times, args), label='steady state')
+    pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha, label='current state')
+    pl.plot(times, np.sqrt(c_linear(times, args)), label='steady state')
     pl.ylabel('beta/alpha')
     pl.legend() 
     pl.subplot(3,1,3)
@@ -200,7 +200,7 @@ print(sys.argv)
 #v = float(sys.argv[5])
 theta = np.pi / 2
 phi = 0
-lam = -1j
+lam = -2j
 gamma = 1
 v = .2
 
@@ -224,9 +224,11 @@ break_points = [0, 5, 10, 15, num_steps]
 #beta = np.sqrt(-2j * lam.conjugate())
 ''' Testing middle state is steady state '''
 alpha = np.sqrt(-2j * lam.conjugate())
-beta = alpha * .15
-psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), qt.coherent(N, beta)) 
-        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), qt.coherent(N, -beta))).unit()
+beta = alpha
+psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), 
+                                                 qt.coherent(N, beta)) 
+        + np.round(np.sin(theta/2), 5) * np.exp(1j * phi) * qt.tensor(qt.coherent(N, -alpha+beta), 
+                                                                      qt.coherent(N, -beta))).unit()
 
 ''' guess at final condition '''
 beta = 0
@@ -291,6 +293,7 @@ if 1:
         args['start_time'] = 0.0
         if i == len(break_points)-1:
             plot_filepath += 'full/'
+            os.makedirs(plot_filepath)
         make_plots(plot_num, break_points[i], times[0:break_points[i]], states, psi0, psi_final, N, plot_filepath)
 
         
