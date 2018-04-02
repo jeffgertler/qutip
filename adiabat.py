@@ -34,7 +34,7 @@ def wigner4d(rho, xvec):
     return np.real(W)
 
 
-def c_linear(t, args):
+def c_quad(t, args):
     t += args['start_time']
     if isinstance(t, float):
         return (max(1.0-args['v'] * t, 0.0))**2
@@ -207,10 +207,12 @@ v = .2
 
 ''' Parameters '''
 N = 15
-joint_drive = lam
 loss = 0.
 joint_loss = 1
-confinment_loss = gamma
+eps1 = lam
+kappa1 = 1
+eps2 = gamma * eps1
+kappa2 = gamma
 
 ''' Solver time steps '''
 num_steps = 20
@@ -242,14 +244,13 @@ b = qt.tensor(qt.qeye(N), qt.destroy(N))
 drive_term = (a + b) **2
 confinment_term = b ** 2
 
-
-loss_ops = [joint_loss * drive_term, confinment_term * confinment_loss]
+loss_ops = [kappa1 * drive_term, kappa2 * confinment_term]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, confinment_term * confinment_loss]
 #loss_ops = [joint_loss * drive_term, loss * a, loss * b, [confinment_term * confinment_loss, c_tanh]]
 
 
-H = [joint_drive * drive_term + joint_drive.conjugate() * drive_term.dag(),
-     [joint_drive * confinment_term + joint_drive.conjugate() * confinment_term.dag(), c_linear]]
+H = [eps1 * drive_term + eps1.conjugate() * drive_term.dag(),
+     [eps2 * confinment_term + eps2.conjugate() * confinment_term.dag(), c_quad]]
 
 
 date = list(str(datetime.datetime.now())[:19])
