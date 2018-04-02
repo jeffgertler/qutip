@@ -193,16 +193,16 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
 
 
 print(sys.argv)
-#theta = float(sys.argv[1]) * np.pi
-#phi = float(sys.argv[2]) * np.pi
-#lam = complex(sys.argv[3])
-#gamma = float(sys.argv[4])
-#v = float(sys.argv[5])
-theta = np.pi / 2
-phi = 0
-lam = -2j
-gamma = 2
-v = .2
+theta = float(sys.argv[1]) * np.pi
+phi = float(sys.argv[2]) * np.pi
+lam = complex(sys.argv[3])
+gamma = float(sys.argv[4])
+v = float(sys.argv[5])
+#theta = np.pi / 2
+#phi = 0
+#lam = -2j
+#gamma = 2
+#v = .2
 
 alpha = np.sqrt(-2j * lam.conjugate())
 
@@ -246,7 +246,7 @@ drive_term = (a + b) **2
 confinment_term = b ** 2
 
 
-loss_ops = [kappa1 * drive_term, kappa2 * confinment_term]
+loss_ops = [kappa1**.5 * drive_term, kappa2**.5 * confinment_term]
 
 H = [eps1 * drive_term + eps1.conjugate() * drive_term.dag(),
      [eps2 * confinment_term + eps2.conjugate() * confinment_term.dag(), c_quad]]
