@@ -95,7 +95,7 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
 
 
     print('building cat array')
-    beta_steps = 10
+    beta_steps = 50
     cat_state_arr = []
     beta_arr = np.linspace(0, alpha, beta_steps)
     for j in range(beta_steps):
@@ -117,7 +117,7 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
     pl.ylabel('beta/alpha')
     pl.subplot(3,1,2)
     pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha, label='current state')
-    pl.plot(times, np.sqrt(c_linear(times, args)), label='steady state')
+    pl.plot(times, np.sqrt(c_quad(times, args)), label='steady state')
     pl.ylabel('beta/alpha')
     pl.legend() 
     pl.subplot(3,1,3)
@@ -201,12 +201,14 @@ print(sys.argv)
 theta = np.pi / 2
 phi = 0
 lam = -2j
-gamma = 1
+gamma = 2
 v = .2
 
+alpha = np.sqrt(-2j * lam.conjugate())
 
 ''' Parameters '''
-N = 15
+N = int(round(4*np.absolute(alpha)**2))
+
 loss = 0.
 joint_loss = 1
 eps1 = lam
@@ -215,17 +217,16 @@ eps2 = gamma * eps1
 kappa2 = gamma
 
 ''' Solver time steps '''
-num_steps = 20
-max_time = 5
+num_steps = 40
+max_time = 1.0/v
 times = np.linspace(0.0, max_time, num_steps, endpoint=True)
-break_points = [0, 5, 10, 15, num_steps]
+break_points = [0, 5, 20, num_steps]
 
 
 ''' Initial condition '''
 #alpha = 0
 #beta = np.sqrt(-2j * lam.conjugate())
 ''' Testing middle state is steady state '''
-alpha = np.sqrt(-2j * lam.conjugate())
 beta = alpha
 psi0 = (np.round(np.cos(theta/2), 5) * qt.tensor(qt.coherent(N, alpha-beta), 
                                                  qt.coherent(N, beta)) 
@@ -244,10 +245,8 @@ b = qt.tensor(qt.qeye(N), qt.destroy(N))
 drive_term = (a + b) **2
 confinment_term = b ** 2
 
-loss_ops = [kappa1 * drive_term, kappa2 * confinment_term]
-#loss_ops = [joint_loss * drive_term, loss * a, loss * b, confinment_term * confinment_loss]
-#loss_ops = [joint_loss * drive_term, loss * a, loss * b, [confinment_term * confinment_loss, c_tanh]]
 
+loss_ops = [kappa1 * drive_term, kappa2 * confinment_term]
 
 H = [eps1 * drive_term + eps1.conjugate() * drive_term.dag(),
      [eps2 * confinment_term + eps2.conjugate() * confinment_term.dag(), c_quad]]
@@ -258,7 +257,7 @@ date[13] = '-'
 date[16] = '-'
 
 ''' SUPER IMPORTANT: change the filepath to wherever you want the plots saved '''
-qutip_filepath = ''
+qutip_filepath = 'C:/Users/Wang Lab/Documents/qutip/'
 plot_filepath = qutip_filepath + 'out/adiabat/' + ''.join(date) + '/'
 data_filepath = qutip_filepath + 'data/'
 
@@ -318,14 +317,15 @@ else:
 np.savetxt(plot_filepath + 'header.txt', [0], 
          header = 
          'N = ' + str(N) + 
-         '\n joint_drive = ' + str(joint_drive) + 
-         '\n confinment_loss = ' + str(confinment_loss) + 
+         '\n lam = ' + str(lam) + 
+         '\n gamma = ' + str(gamma) + 
          '\n loss = ' + str(loss) +  
          '\n joint_loss = ' + str(joint_loss) +  
          '\n alpha = ' + str(alpha) + 
          '\n beta = ' + str(beta) + 
          '\n theta = ' + str(theta) + 
          '\n phi = ' + str(phi) + 
+         '\n v = ' + str(v) + 
          '\n num_steps = ' + str(num_steps) + 
          '\n max_time = ' + str(max_time))
 
