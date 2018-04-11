@@ -115,15 +115,19 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
     pl.imshow(fidelity_arr.transpose(), extent = (0, max_time, beta_arr[-1]/alpha, beta_arr[0]/alpha))
     pl.colorbar()
     pl.ylabel('beta/alpha')
+    pl.grid(True)
     pl.subplot(3,1,2)
     pl.plot(times, beta_arr[np.argmax(fidelity_arr, axis=1)]/alpha, label='current state')
     pl.plot(times, np.sqrt(c_quad(times, args)), label='steady state')
     pl.ylabel('beta/alpha')
     pl.legend() 
+    pl.grid(True)
     pl.subplot(3,1,3)
     pl.plot(times, np.max(fidelity_arr, axis=1))
     pl.ylabel('fidelity')
     pl.xlabel('time')
+    pl.tight_layout()
+    pl.grid(True)
     pl.savefig(plot_filepath + '2d_fidelity' + str(plot_num) + '.png')
     pl.clf()
 
@@ -193,21 +197,25 @@ def make_plots(plot_num, num_steps, times, states, psi0, psi_final, N, plot_file
 
 
 print(sys.argv)
-theta = float(sys.argv[1]) * np.pi
-phi = float(sys.argv[2]) * np.pi
-lam = complex(sys.argv[3])
-gamma = float(sys.argv[4])
-v = float(sys.argv[5])
-#theta = np.pi / 2
-#phi = 0
-#lam = -2j
-#gamma = 2
-#v = .2
+#theta = float(sys.argv[1]) * np.pi
+#phi = float(sys.argv[2]) * np.pi
+#lam = complex(sys.argv[3])
+#gamma = float(sys.argv[4])
+#v = float(sys.argv[5])
+theta = np.pi / 2
+phi = 0
+lam = -5j
+gamma = 10
+v = .1
 
 alpha = np.sqrt(-2j * lam.conjugate())
 
 ''' Parameters '''
-N = int(round(4*np.absolute(alpha)**2))
+N = int(round(np.absolute(alpha)**2))
+while qt.coherent(N, alpha).full()[-1]/np.max(qt.coherent(N, alpha).full()) > .01:
+    N+=1
+print('N=', N)
+
 
 loss = 0.
 joint_loss = 1
@@ -220,7 +228,7 @@ kappa2 = gamma
 num_steps = 40
 max_time = 1.0/v
 times = np.linspace(0.0, max_time, num_steps, endpoint=True)
-break_points = [0, 5, 20, num_steps]
+break_points = [0, 2, 20, num_steps]
 
 
 ''' Initial condition '''
@@ -265,6 +273,26 @@ if not os.path.exists(plot_filepath):
     os.makedirs(plot_filepath)
 if not os.path.exists(data_filepath):
     os.makedirs(data_filepath)
+
+
+
+''' Saving textfile with information about the run '''
+np.savetxt(plot_filepath + 'header.txt', [0], 
+         header = 
+         'N = ' + str(N) + 
+         '\n lam = ' + str(lam) + 
+         '\n gamma = ' + str(gamma) + 
+         '\n loss = ' + str(loss) +  
+         '\n joint_loss = ' + str(joint_loss) +  
+         '\n alpha = ' + str(alpha) + 
+         '\n beta = ' + str(beta) + 
+         '\n theta = ' + str(theta) + 
+         '\n phi = ' + str(phi) + 
+         '\n v = ' + str(v) + 
+         '\n num_steps = ' + str(num_steps) + 
+         '\n max_time = ' + str(max_time))
+
+
 
 ''' Solve the system or load from save'''
 args = {'v': v, 'start_time':0.0}
@@ -313,21 +341,6 @@ else:
 
 
 
-''' Saving textfile with information about the run '''
-np.savetxt(plot_filepath + 'header.txt', [0], 
-         header = 
-         'N = ' + str(N) + 
-         '\n lam = ' + str(lam) + 
-         '\n gamma = ' + str(gamma) + 
-         '\n loss = ' + str(loss) +  
-         '\n joint_loss = ' + str(joint_loss) +  
-         '\n alpha = ' + str(alpha) + 
-         '\n beta = ' + str(beta) + 
-         '\n theta = ' + str(theta) + 
-         '\n phi = ' + str(phi) + 
-         '\n v = ' + str(v) + 
-         '\n num_steps = ' + str(num_steps) + 
-         '\n max_time = ' + str(max_time))
 
 
 
